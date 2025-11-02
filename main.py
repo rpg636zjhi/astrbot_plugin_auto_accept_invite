@@ -249,11 +249,15 @@ class BlacklistManager(Star):
     @filter.permission_type(filter.PermissionType.ADMIN)
     async def config_show(self, event: AstrMessageEvent):
         '''查看当前配置'''
+        # 修复f-string引号问题
+        auto_save_interval = self.config['auto_save_interval']
+        auto_save_display = f"{auto_save_interval}秒" if auto_save_interval > 0 else "❌ 禁用"
+        
         config_msg = (
             "⚙️ 黑名单插件配置:\n"
             f"• 拦截功能: {'✅ 启用' if self.config['enable_interception'] else '❌ 禁用'}\n"
             f"• 拦截通知: {'✅ 开启' if self.config['notify_on_intercept'] else '❌ 关闭'}\n"
-            f"• 自动保存: {f'{self.config["auto_save_interval"]}秒' if self.config['auto_save_interval'] > 0 else '❌ 禁用'}\n"
+            f"• 自动保存: {auto_save_display}\n"
             f"• 最大数量: {self.config['max_blacklist_size']}\n"
             f"• 拦截消息: {self.config['intercept_message']}"
         )
