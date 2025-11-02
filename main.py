@@ -134,7 +134,9 @@ class BlacklistManager(Star):
         
         # 检查用户是否在黑名单中
         if sender_id in self.user_blacklist:
-            logger.info(f"拦截黑名单用户 {sender_id} 的消息: {event.get_plain_text()}")
+            # 使用正确的方法获取消息内容
+            message_text = getattr(event, 'raw_message', '未知消息')
+            logger.info(f"拦截黑名单用户 {sender_id} 的消息: {message_text}")
             
             # 如果启用了拦截通知，发送提示消息
             if self.config["notify_on_intercept"] and self.config["intercept_message"]:
@@ -149,7 +151,9 @@ class BlacklistManager(Star):
         
         # 检查群组是否在黑名单中（如果是群消息）
         if group_id and group_id in self.group_blacklist:
-            logger.info(f"拦截黑名单群组 {group_id} 的消息: {event.get_plain_text()}")
+            # 使用正确的方法获取消息内容
+            message_text = getattr(event, 'raw_message', '未知消息')
+            logger.info(f"拦截黑名单群组 {group_id} 的消息: {message_text}")
             
             # 如果启用了拦截通知，发送提示消息
             if self.config["notify_on_intercept"] and self.config["intercept_message"]:
