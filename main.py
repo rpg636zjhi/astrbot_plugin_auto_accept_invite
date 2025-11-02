@@ -359,6 +359,7 @@ class BlacklistManager(Star):
 
     # 黑名单检查 - 拦截黑名单用户或群组的消息
     @filter.event_message_type(filter.EventMessageType.ALL)
+    @filter.priority(999)  # 设置高优先级，确保在其他插件之前执行
     async def check_blacklist(self, event: AstrMessageEvent):
         '''检查消息是否来自黑名单用户或群组'''
         # 检查是否启用拦截功能
@@ -370,30 +371,34 @@ class BlacklistManager(Star):
         
         # 检查用户是否在黑名单中
         if sender_id in self.user_blacklist:
-            logger.info(f"拦截黑名单用户 {sender_id} 的消息")
+            logger.info(f"拦截黑名单用户 {sender_id} 的消息: {event.get_plain_text()}")
             
             # 如果启用了拦截通知，发送提示消息
             if self.config["notify_on_intercept"] and self.config["intercept_message"]:
                 try:
+                    # 直接使用 yield 而不是 yield from
                     yield event.plain_result(self.config["intercept_message"])
                 except Exception as e:
                     logger.error(f"发送拦截通知失败: {e}")
             
-            event.stop_event()  # 停止事件传播
+            # 彻底停止事件传播
+            event.stop_event()
             return
         
         # 检查群组是否在黑名单中（如果是群消息）
         if group_id and group_id in self.group_blacklist:
-            logger.info(f"拦截黑名单群组 {group_id} 的消息")
+            logger.info(f"拦截黑名单群组 {group_id} 的消息: {event.get_plain_text()}")
             
             # 如果启用了拦截通知，发送提示消息
             if self.config["notify_on_intercept"] and self.config["intercept_message"]:
                 try:
+                    # 直接使用 yield 而不是 yield from
                     yield event.plain_result(self.config["intercept_message"])
                 except Exception as e:
                     logger.error(f"发送拦截通知失败: {e}")
             
-            event.stop_event()  # 停止事件传播
+            # 彻底停止事件传播
+            event.stop_event()
             return
 
     async def terminate(self):
