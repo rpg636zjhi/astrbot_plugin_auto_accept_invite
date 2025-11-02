@@ -45,11 +45,9 @@ class AutoAcceptInvitePlugin(Star):
                 "user_ids": []
             }
         }
-        # 缓存QQ平台客户端
         self.qq_client = None
-        logger.info("插件加载成功：支持Bot管理员在群内管理黑名单")
+        logger.info("插件加载成功")
 
-    # 自动创建配置文件
     def _auto_create_conf_schema(self):
         plugin_dir = os.path.dirname(os.path.abspath(__file__))
         conf_schema_path = os.path.join(plugin_dir, "_conf_schema.json")
@@ -57,20 +55,17 @@ class AutoAcceptInvitePlugin(Star):
             try:
                 with open(conf_schema_path, "w", encoding="utf-8") as f:
                     json.dump(DEFAULT_CONF_SCHEMA, f, ensure_ascii=False, indent=2)
-                logger.info(f"自动创建配置文件：{conf_schema_path}")
+                logger.info(f"创建配置文件：{conf_schema_path}")
             except Exception as e:
                 logger.error(f"创建配置文件失败：{str(e)}")
 
-    # 获取QQ平台客户端
     async def _get_qq_client(self):
         if self.qq_client:
             return self.qq_client
         
         try:
-            # 方式1：尝试从platform_manager获取（新版）
             platforms = self.context.platform_manager.get_insts()
             for platform in platforms:
-                # 判断是否是QQ个人号平台（aiocqhttp）
                 if platform.get_platform_name() == "aiocqhttp":
                     self.qq_client = platform.get_client()
                     return self.qq_client
@@ -78,7 +73,6 @@ class AutoAcceptInvitePlugin(Star):
             pass
 
         try:
-            # 方式2：尝试兼容旧版导入（备用）
             from astrbot.core.platform.sources.aiocqhttp.aiocqhttp_platform_adapter import AiocqhttpPlatformAdapter
             platform = self.context.get_platform(filter.PlatformAdapterType.AIOCQHTTP)
             if isinstance(platform, AiocqhttpPlatformAdapter):
@@ -90,17 +84,18 @@ class AutoAcceptInvitePlugin(Star):
         logger.error("无法获取QQ平台客户端，入群相关功能失效")
         return None
 
-    # 1. 处理被邀请入群事件（自动同意/拦截）
     @filter.platform_adapter_type(filter.PlatformAdapterType.AIOCQHTTP)
-    @filter.event_message_type(filter.EventMessageType.GROUP_INVITE)
+    @filter.event_message_type(filter.EventMessageType.GROUP_ADD_REQUEST)  # 适配旧版本事件类型
     async def handle_group_invite(self, event: AstrMessageEvent):
-        invite_user_id = event.get_sender_id()
-        group_id = event.message_obj.group_id
-        invite_user_name = event.get_sender_name()
-        invite_flag = event.message_obj.raw_message.get("flag")
+        # 旧版本中群邀请事件的信息结构可能不同，调整获取方式
+        invite_info = event.message_obj.raw_message
+        invite_user_id = str(invite_info.get("user_id"))  # 邀请者QQ号
+        group_id = str(invite_info.get("group_id"))       # 被邀请的群号
+        invite_flag = invite_info.get("flag")             # 邀请标识
+        invite_user_name = event.get_sender_name() or "未知用户"
 
-        if not invite_flag:
-            logger.error("未获取到邀请标识，无法处理")
+        if not invite_flag or not group_id or not invite_user_id:
+            logger.error("未获取到完整的邀请信息，无法处理")
             return
 
         # 黑名单校验
@@ -121,7 +116,6 @@ class AutoAcceptInvitePlugin(Star):
         await self.accept_invite(invite_flag)
         yield event.plain_result(f"已自动同意加入群 {group_id}，欢迎交流！")
 
-    # 2. 主动入群指令（仅Bot管理员可用）
     @filter.platform_adapter_type(filter.PlatformAdapterType.AIOCQHTTP)
     @filter.is_admin()
     @filter.command("入群", aliases=["加群"], usage="入群 [QQ群号] - Bot管理员指令，发送入群申请")
@@ -156,7 +150,6 @@ class AutoAcceptInvitePlugin(Star):
             logger.error(f"入群申请失败：{str(e)}")
             yield event.plain_result(f"申请失败：{str(e)}")
 
-    # 3. 黑名单管理指令（仅Bot管理员可用）
     @filter.platform_adapter_type(filter.PlatformAdapterType.AIOCQHTTP)
     @filter.is_admin()
     @filter.command("添加黑名单群", usage="添加黑名单群 [群号] - 阻止Bot加入该群")
@@ -229,7 +222,6 @@ class AutoAcceptInvitePlugin(Star):
         logger.info(f"Bot管理员移除黑名单用户：{user_id}")
         yield event.plain_result(f"已将用户 {user_id} 移出黑名单")
 
-    # 辅助方法：提取指令中的数字参数
     def _extract_number_param(self, text: str, command: str) -> Optional[str]:
         match = re.search(f"{command}\\s*(\\d+)", text.strip())
         if match:
@@ -238,7 +230,6 @@ class AutoAcceptInvitePlugin(Star):
                 return param
         return None
 
-    # 保存配置到文件
     async def _save_config(self):
         try:
             await self.context.update_plugin_config(
@@ -249,7 +240,6 @@ class AutoAcceptInvitePlugin(Star):
         except Exception as e:
             logger.error(f"保存配置失败：{str(e)}")
 
-    # 同意邀请
     async def accept_invite(self, invite_flag: str):
         client = await self._get_qq_client()
         if not client:
@@ -258,13 +248,12 @@ class AutoAcceptInvitePlugin(Star):
             await client.api.call_action(
                 "set_group_add_request",
                 flag=invite_flag,
-                sub_type="invite",
+                sub_type="invite",  # 邀请类型
                 approve=True
             )
         except Exception as e:
             logger.error(f"同意入群失败：{str(e)}")
 
-    # 拒绝邀请
     async def reject_invite(self, invite_flag: str):
         client = await self._get_qq_client()
         if not client:
