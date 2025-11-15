@@ -6,7 +6,7 @@ import os
 import asyncio
 from typing import Set
 
-@register("auto_leave", "开发者", "自动退群插件", "1.0.0")
+@register("auto_leave", "rpg636zjhi", "自动退群插件", "1.0.0")
 class AutoLeave(Star):
     def __init__(self, context: Context):
         super().__init__(context)
@@ -70,9 +70,8 @@ class AutoLeave(Star):
         if not event.is_private_chat():
             current_group = event.get_group_id()
             if current_group == group_number:
-                # 使用 yield from 而不是 await
-                async for result in self._leave_group(event, group_number):
-                    yield result
+                # 直接调用退群函数，不等待结果
+                asyncio.create_task(self._perform_leave_group(event, group_number))
 
     @filter.command("移除黑名单群")
     @filter.permission_type(filter.PermissionType.ADMIN)
@@ -100,11 +99,11 @@ class AutoLeave(Star):
             blacklist_str = "\n".join(sorted_list)
             yield event.plain_result(f"群黑名单列表 ({len(sorted_list)} 个):\n{blacklist_str}")
 
-    async def _leave_group(self, event: AstrMessageEvent, group_id: str):
-        """执行退群操作"""
+    async def _perform_leave_group(self, event: AstrMessageEvent, group_id: str):
+        """执行退群操作 - 这是一个普通的异步函数，不是生成器"""
         try:
             # 先发送退群通知
-            yield event.plain_result("该群已被管理员拉黑，机器人将自动退出。")
+            await event.send(event.plain_result("该群已被管理员拉黑，机器人将自动退出。"))
             
             # 等待一下确保消息发送成功
             await asyncio.sleep(1)
@@ -131,9 +130,8 @@ class AutoLeave(Star):
         # 检查当前群是否在黑名单中
         if group_id in self.group_blacklist:
             logger.info(f"检测到在黑名单群 {group_id} 中，准备退群")
-            # 使用 yield from 而不是 await
-            async for result in self._leave_group(event, group_id):
-                yield result
+            # 直接调用退群函数，不等待结果
+            asyncio.create_task(self._perform_leave_group(event, group_id))
             event.stop_event()
 
     @filter.command("测试退群")
@@ -158,9 +156,8 @@ class AutoLeave(Star):
             # 等待一下确保消息发送成功
             await asyncio.sleep(1)
             
-            # 执行退群 - 使用 yield from 而不是 await
-            async for result in self._leave_group(event, group_id):
-                yield result
+            # 直接调用退群函数，不等待结果
+            asyncio.create_task(self._perform_leave_group(event, group_id))
         else:
             yield event.plain_result("无法获取群号")
 
